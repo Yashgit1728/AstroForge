@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import './index.css'
 
@@ -12,7 +12,7 @@ function App() {
       alert('Please enter a mission description');
       return;
     }
-    
+
     setIsGenerating(true);
     try {
       const response = await fetch('http://localhost:8000/api/v1/missions/generate', {
@@ -22,7 +22,7 @@ function App() {
         },
         body: JSON.stringify({ prompt }),
       });
-      
+
       if (response.ok) {
         const mission = await response.json();
         setGeneratedMission(mission);
@@ -74,7 +74,7 @@ function App() {
             AstraForge
           </h1>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-            AI-powered space mission simulator. Design, simulate, and optimize space missions 
+            AI-powered space mission simulator. Design, simulate, and optimize space missions
             with cutting-edge physics and interactive 3D visualization.
           </p>
         </div>
@@ -84,7 +84,7 @@ function App() {
             <h2 className="text-2xl font-semibold text-white mb-6 text-center">
               Describe Your Mission
             </h2>
-            
+
             <div className="space-y-4">
               <textarea
                 value={prompt}
@@ -93,15 +93,15 @@ function App() {
                 rows={4}
                 placeholder="Describe your space mission idea... (e.g., 'Send a probe to Mars to study the atmosphere and search for signs of life')"
               />
-              
-              <button 
+
+              <button
                 onClick={handleGenerateMission}
                 disabled={!prompt.trim() || isGenerating}
                 className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white font-medium py-3 px-6 rounded-lg transition-colors"
               >
                 {isGenerating ? '🔄 Generating Mission...' : '🚀 Generate Mission'}
               </button>
-              
+
               <p className="text-sm text-gray-400 text-center">
                 Our AI will generate a detailed mission specification based on your description
               </p>
@@ -113,7 +113,7 @@ function App() {
                   ✅ Mission Generated: {generatedMission.name}
                 </h3>
                 <p className="text-green-200 mb-4">{generatedMission.description}</p>
-                
+
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="bg-white/5 p-4 rounded-lg">
                     <h4 className="font-semibold text-white mb-2">🚀 Spacecraft</h4>
@@ -121,7 +121,7 @@ function App() {
                     <p className="text-gray-300 text-sm">Mass: {generatedMission.spacecraft?.mass_kg} kg</p>
                     <p className="text-gray-300 text-sm">Fuel: {generatedMission.spacecraft?.fuel_capacity_kg} kg</p>
                   </div>
-                  
+
                   <div className="bg-white/5 p-4 rounded-lg">
                     <h4 className="font-semibold text-white mb-2">🛰️ Trajectory</h4>
                     <p className="text-gray-300 text-sm">From: {generatedMission.trajectory?.departure}</p>
@@ -129,8 +129,8 @@ function App() {
                     <p className="text-gray-300 text-sm">Duration: {generatedMission.trajectory?.duration_days} days</p>
                   </div>
                 </div>
-                
-                <button 
+
+                <button
                   onClick={() => setGeneratedMission(null)}
                   className="mt-4 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm"
                 >

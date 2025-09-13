@@ -27,6 +27,6 @@
     }
   },
   "include": ["src"],
-  "exclude": ["src/components-old"],
+  "exclude": ["src/components-old", "**/*.test.tsx", "**/*.test.ts", "**/__tests__/**", "src/main.*.tsx", "src/App.simple.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

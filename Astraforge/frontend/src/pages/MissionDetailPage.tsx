@@ -430,7 +430,7 @@ const MissionSpecifications: React.FC<{
           <div className="mt-6">
             <h3 className="text-lg font-medium text-white mb-3">Planned Maneuvers</h3>
             <div className="space-y-2">
-              {mission.trajectory.maneuvers.map((maneuver, index) => (
+              {mission.trajectory.maneuvers.map((maneuver) => (
                 <div key={maneuver.id} className="flex justify-between items-center p-3 bg-white/5 rounded-lg">
                   <div>
                     <span className="text-white font-medium">{maneuver.name}</span>
@@ -480,7 +480,7 @@ const MissionSpecifications: React.FC<{
 };
 
 // Charts and Analytics Component
-const ChartsAndAnalytics: React.FC<{ mission: Mission }> = ({ mission }) => {
+const ChartsAndAnalytics: React.FC<{ mission: Mission }> = ({ mission: _mission }) => {
   return (
     <div className="space-y-6">
       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
@@ -511,7 +511,7 @@ const ChartsAndAnalytics: React.FC<{ mission: Mission }> = ({ mission }) => {
 };
 
 // 3D Visualization Component
-const ThreeDVisualization: React.FC<{ mission: Mission }> = ({ mission }) => {
+const ThreeDVisualization: React.FC<{ mission: Mission }> = ({ mission: _mission }) => {
   return (
     <div className="space-y-6">
       <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
@@ -532,7 +532,7 @@ const ThreeDVisualization: React.FC<{ mission: Mission }> = ({ mission }) => {
 };
 
 // Mission Actions Component
-const MissionActions: React.FC<{ mission: Mission }> = ({ mission }) => {
+const MissionActions: React.FC<{ mission: Mission }> = ({ mission: _mission }) => {
   return (
     <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
       <h3 className="text-xl font-semibold text-white mb-4">Mission Actions</h3>
