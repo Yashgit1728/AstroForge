@@ -1,17 +1,12 @@
-import React, { useState } from 'react'
-import ReactDOM from 'react-dom/client'
-import './index.css'
+import React, { useState } from 'react';
 
-function App() {
+const HomePage: React.FC = () => {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedMission, setGeneratedMission] = useState<any>(null);
 
   const handleGenerateMission = async () => {
-    if (!prompt.trim()) {
-      alert('Please enter a mission description');
-      return;
-    }
+    if (!prompt.trim()) return;
     
     setIsGenerating(true);
     try {
@@ -26,52 +21,22 @@ function App() {
       if (response.ok) {
         const mission = await response.json();
         setGeneratedMission(mission);
-        setPrompt(''); // Clear the input
       } else {
-        alert('Failed to generate mission. Please try again.');
+        console.error('Failed to generate mission');
       }
     } catch (error) {
       console.error('Error generating mission:', error);
-      alert('Error connecting to backend. Make sure the server is running.');
     } finally {
       setIsGenerating(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-black text-white relative">
-      {/* Animated Star Field Background */}
-      <div className="fixed inset-0 overflow-hidden">
-        <div className="stars"></div>
-        <div className="stars2"></div>
-        <div className="stars3"></div>
-      </div>
-
-      {/* Navigation */}
-      <nav className="relative z-20 p-6">
-        <div className="container mx-auto flex justify-between items-center">
-          <div className="text-2xl font-bold text-white">
-            🚀 AstraForge
-          </div>
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-white hover:text-purple-300 transition-colors font-medium">
-              Home
-            </a>
-            <a href="#" className="text-white hover:text-purple-300 transition-colors font-medium">
-              Gallery
-            </a>
-            <button className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-              Sign In
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <div className="relative z-10 container mx-auto px-4 py-16">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
           <h1 className="text-6xl font-bold text-white mb-6">
-            AstraForge
+            🚀 AstraForge
           </h1>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto">
             AI-powered space mission simulator. Design, simulate, and optimize space missions 
@@ -129,19 +94,11 @@ function App() {
                     <p className="text-gray-300 text-sm">Duration: {generatedMission.trajectory?.duration_days} days</p>
                   </div>
                 </div>
-                
-                <button 
-                  onClick={() => setGeneratedMission(null)}
-                  className="mt-4 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg text-sm"
-                >
-                  Generate Another Mission
-                </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Feature Cards */}
         <div className="grid md:grid-cols-3 gap-8 mt-16">
           <div className="text-center">
             <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -167,7 +124,7 @@ function App() {
             <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
               👁️
             </div>
-            <h3 className="text-xl font-semibold text-white mb-2">3D Visualization</h3>
+            <h3 className="text-xl font-semibent text-white mb-2">3D Visualization</h3>
             <p className="text-gray-300">
               Explore your missions in interactive 3D with spacecraft, trajectories, and celestial bodies
             </p>
@@ -176,6 +133,6 @@ function App() {
       </div>
     </div>
   );
-}
+};
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<App />)
+export default HomePage;

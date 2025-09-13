@@ -11,7 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 try:
     from supabase import create_client, Client
-    from gotrue.errors import AuthError
+    try:
+        from gotrue.errors import AuthError
+    except ImportError:
+        # Fallback for different supabase versions
+        from supabase.lib.client_options import ClientOptions
+        AuthError = Exception
     SUPABASE_AVAILABLE = True
 except ImportError:
     SUPABASE_AVAILABLE = False
@@ -147,6 +152,9 @@ class AuthService:
             
             return None
             
+        except ImportError:
+            logger.error("PyJWT not available for JWT verification")
+            return None
         except Exception as e:
             logger.error(f"JWT fallback verification failed: {e}")
             return None

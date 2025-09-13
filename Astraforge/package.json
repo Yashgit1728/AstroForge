@@ -1,0 +1,39 @@
+{
+  "name": "astraforge",
+  "version": "1.0.0",
+  "description": "AI-powered space mission simulator",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "backend": "cd backend && python simple_app.py",
+    "frontend": "cd frontend && npm run dev",
+    "install-all": "npm install && cd backend && pip install -r requirements.txt && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "test": "concurrently \"cd backend && python -m pytest\" \"cd frontend && npm run test:run\"",
+    "lint": "concurrently \"cd backend && ruff check .\" \"cd frontend && npm run lint\"",
+    "clean": "rimraf frontend/dist backend/__pycache__ backend/.pytest_cache"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "rimraf": "^5.0.5"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "python": ">=3.11.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/astraforge.git"
+  },
+  "keywords": [
+    "space",
+    "mission",
+    "simulator",
+    "ai",
+    "physics",
+    "orbital-mechanics"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

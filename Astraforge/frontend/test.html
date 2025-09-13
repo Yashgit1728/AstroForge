@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AstraForge Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div class="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white">
+        <div class="container mx-auto px-4 py-16">
+            <div class="text-center">
+                <h1 class="text-6xl font-bold text-white mb-6">
+                    🚀 AstraForge
+                </h1>
+                <p class="text-xl text-gray-300 mb-8">
+                    AI-powered space mission simulator
+                </p>
+                
+                <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 max-w-2xl mx-auto">
+                    <h2 class="text-2xl font-semibold text-white mb-6">
+                        Frontend Test Page
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <textarea
+                            class="w-full p-4 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400"
+                            rows="4"
+                            placeholder="Describe your space mission..."
+                        ></textarea>
+                        
+                        <button 
+                            class="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-3 px-6 rounded-lg"
+                            onclick="generateMission()"
+                        >
+                            Generate Mission
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mt-8 text-green-300">
+                    ✅ Static HTML version is working!
+                </div>
+                
+                <div class="mt-4">
+                    <a href="http://localhost:8000/health" target="_blank" class="text-blue-300 underline">
+                        Test Backend Connection
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function generateMission() {
+            const textarea = document.querySelector('textarea');
+            const prompt = textarea.value;
+            
+            if (!prompt.trim()) {
+                alert('Please enter a mission description');
+                return;
+            }
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/missions/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt }),
+                });
+                
+                if (response.ok) {
+                    const mission = await response.json();
+                    alert(`Mission Generated: ${mission.name}\n\n${mission.description}`);
+                } else {
+                    alert('Failed to generate mission');
+                }
+            } catch (error) {
+                alert('Error connecting to backend: ' + error.message);
+            }
+        }
+        
+        // Test backend connection on load
+        fetch('http://localhost:8000/health')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Backend status:', data);
+                if (data.status === 'healthy') {
+                    document.body.insertAdjacentHTML('beforeend', 
+                        '<div style="position: fixed; top: 10px; right: 10px; background: green; color: white; padding: 10px; border-radius: 5px;">Backend Connected ✅</div>'
+                    );
+                }
+            })
+            .catch(error => {
+                console.error('Backend connection failed:', error);
+                document.body.insertAdjacentHTML('beforeend', 
+                    '<div style="position: fixed; top: 10px; right: 10px; background: red; color: white; padding: 10px; border-radius: 5px;">Backend Disconnected ❌</div>'
+                );
+            });
+    </script>
+</body>
+</html>

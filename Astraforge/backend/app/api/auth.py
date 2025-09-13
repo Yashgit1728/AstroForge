@@ -402,9 +402,14 @@ async def get_user_sessions(
         )
 
 
+class SessionValidationRequest(BaseModel):
+    """Request schema for session validation."""
+    session_token: str = Field(..., description="Session token to validate")
+
+
 @router.post("/validate")
 async def validate_session(
-    session_token: str,
+    request: SessionValidationRequest,
     db: AsyncSession = Depends(get_db)
 ) -> Dict[str, bool]:
     """
@@ -415,7 +420,7 @@ async def validate_session(
     """
     try:
         auth_service = AuthService(db)
-        is_valid = await auth_service.validate_session_token(session_token)
+        is_valid = await auth_service.validate_session_token(request.session_token)
         
         return {"valid": is_valid}
         

@@ -1,40 +1,22 @@
-import { useState } from 'react'
-import Header from './components/Header'
-import MissionPlanner from './components/MissionPlanner'
-import MissionDashboard from './components/MissionDashboard'
-import VehicleManagement from './components/VehicleManagement'
-import SimulationCenter from './components/SimulationCenter'
-import StarField from './components/StarField'
-
-type ActiveView = 'dashboard' | 'planner' | 'vehicles' | 'simulation';
+import { Routes, Route } from 'react-router-dom';
+import { HomePage, MissionDetailPage, GalleryPage } from './pages';
+import Navigation from './components/Navigation';
+import StarField from './components/StarField';
 
 function App() {
-  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
-
-  const renderContent = () => {
-    switch (activeView) {
-      case 'dashboard':
-        return <MissionDashboard />;
-      case 'planner':
-        return <MissionPlanner />;
-      case 'vehicles':
-        return <VehicleManagement />;
-      case 'simulation':
-        return <SimulationCenter />;
-      default:
-        return <MissionDashboard />;
-    }
-  };
-
   return (
-    <div className="min-h-screen text-white relative">
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
       <StarField />
+      <Navigation />
       <div className="relative z-10">
-        <Header activeView={activeView} setActiveView={setActiveView} />
-        {renderContent()}
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/gallery" element={<GalleryPage />} />
+          <Route path="/mission/:id" element={<MissionDetailPage />} />
+        </Routes>
       </div>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;

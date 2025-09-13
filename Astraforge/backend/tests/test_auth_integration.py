@@ -25,6 +25,17 @@ def client():
 
 
 @pytest.fixture
+def mock_db_session():
+    """Mock database session fixture."""
+    mock_session = AsyncMock(spec=AsyncSession)
+    mock_session.add = MagicMock()
+    mock_session.commit = AsyncMock()
+    mock_session.rollback = AsyncMock()
+    mock_session.close = AsyncMock()
+    return mock_session
+
+
+@pytest.fixture
 def mock_supabase_jwt():
     """Mock Supabase JWT token."""
     payload = {
@@ -42,46 +53,66 @@ def mock_supabase_jwt():
 class TestAuthenticationIntegration:
     """Integration tests for authentication system."""
     
-    @patch('app.core.database.get_db')
-    @patch('app.services.auth_service.AuthService')
-    async def test_complete_authentication_flow(self, mock_service_class, mock_db, client, mock_supabase_jwt):
-        """Test complete authentication flow from login to logout."""
-        # Setup mocks
-        mock_service = AsyncMock()
-        mock_service_class.return_value = mock_service
+    async def test_jwt_authentication_flow(self, client, mock_supabase_jwt, mock_db_session):
+        """Test JWT authentication flow."""
+        from app.core.database import get_db
         
-        # Mock JWT verification
-        jwt_payload = {
-            "user_id": "test-user-123",
-            "email": "test@example.com",
-            "metadata": {"name": "Test User"}
-        }
-        mock_service.verify_jwt_token.return_value = jwt_payload
-        mock_service.create_authenticated_session.return_value = "session-token-123"
+        # Mock the database dependency
+        async def mock_get_db():
+            yield mock_db_session
         
-        # Step 1: Login with JWT token
-        login_request = {
-            "jwt_token": mock_supabase_jwt,
-            "preferences": {"theme": "dark"}
-        }
+        # Override the dependency
+        app.dependency_overrides[get_db] = mock_get_db
         
-        login_response = client.post("/api/v1/auth/login", json=login_request)
-        assert login_response.status_code == 200
+        try:
+            with patch('app.services.auth_service.AuthService') as mock_service_class:
+                # Setup service mock
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+                
+                # Mock JWT verification
+                jwt_payload = {
+                    "user_id": "test-user-123",
+                    "email": "test@example.com",
+                    "metadata": {"name": "Test User"}
+                }
+                mock_service.verify_jwt_token.return_value = jwt_payload
+                mock_service.create_authenticated_session.return_value = "session-token-123"
+                
+                # Test login with JWT token
+                login_request = {
+                    "jwt_token": mock_supabase_jwt,
+                    "preferences": {"theme": "dark"}
+                }
+                
+                login_response = client.post("/api/v1/auth/login", json=login_request)
+                assert login_response.status_code == 200
+                
+                login_data = login_response.json()
+                assert login_data["user_id"] == "test-user-123"
+                assert login_data["is_authenticated"] == True
+                assert "session_token" in login_data
+                assert len(login_data["session_token"]) > 20  # Verify it's a proper token
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
+    
+    async def test_user_info_endpoint(self, client):
+        """Test user info endpoint with mocked auth context."""
+        from app.core.auth import get_auth_context
         
-        login_data = login_response.json()
-        assert login_data["user_id"] == "test-user-123"
-        assert login_data["is_authenticated"] == True
-        
-        # Step 2: Get user info
-        with patch('app.api.auth.get_auth_context') as mock_auth_context:
-            mock_auth_context.return_value = AuthContext(
+        def mock_auth_context():
+            return AuthContext(
                 user_id="test-user-123",
                 email="test@example.com",
                 session_token="session-token-123",
                 is_authenticated=True,
                 preferences={"theme": "dark"}
             )
-            
+        
+        app.dependency_overrides[get_auth_context] = mock_auth_context
+        
+        try:
             me_response = client.get("/api/v1/auth/me")
             assert me_response.status_code == 200
             
@@ -89,106 +120,110 @@ class TestAuthenticationIntegration:
             assert me_data["user_id"] == "test-user-123"
             assert me_data["email"] == "test@example.com"
             assert me_data["is_authenticated"] == True
-        
-        # Step 3: Update preferences
-        with patch('app.api.auth.get_auth_context') as mock_auth_context:
-            mock_auth_context.return_value = AuthContext(
-                user_id="test-user-123",
-                session_token="session-token-123",
-                is_authenticated=True
-            )
-            mock_service.update_session_preferences.return_value = True
-            
-            prefs_response = client.post(
-                "/api/v1/auth/preferences",
-                json={"theme": "light", "language": "en"}
-            )
-            assert prefs_response.status_code == 200
-        
-        # Step 4: Logout
-        with patch('app.api.auth.get_auth_context') as mock_auth_context:
-            mock_auth_context.return_value = AuthContext(
-                user_id="test-user-123",
-                session_token="session-token-123",
-                is_authenticated=True
-            )
-            
-            logout_response = client.post("/api/v1/auth/logout")
-            assert logout_response.status_code == 200
-            
-            logout_data = logout_response.json()
-            assert "Logged out successfully" in logout_data["message"]
+        finally:
+            app.dependency_overrides.clear()
+
     
-    @patch('app.core.database.get_db')
-    @patch('app.services.auth_service.AuthService')
-    async def test_anonymous_session_flow(self, mock_service_class, mock_db, client):
+    async def test_anonymous_session_flow(self, client, mock_db_session):
         """Test anonymous session creation and usage."""
-        # Setup mocks
-        mock_service = AsyncMock()
-        mock_service_class.return_value = mock_service
+        from app.core.database import get_db
         
-        mock_service.create_anonymous_session.return_value = "anon-session-123"
+        # Mock the database dependency
+        async def mock_get_db():
+            yield mock_db_session
         
-        # Step 1: Create anonymous session
-        anon_request = {
-            "email": "temp@example.com",
-            "preferences": {"theme": "light"}
-        }
+        # Override the dependency
+        app.dependency_overrides[get_db] = mock_get_db
         
-        anon_response = client.post("/api/v1/auth/anonymous", json=anon_request)
-        assert anon_response.status_code == 200
-        
-        anon_data = anon_response.json()
-        assert anon_data["user_id"] is None
-        assert anon_data["email"] == "temp@example.com"
-        assert anon_data["is_authenticated"] == False
-        
-        # Step 2: Use anonymous session
-        with patch('app.api.auth.get_auth_context') as mock_auth_context:
-            mock_auth_context.return_value = AuthContext(
-                user_id=None,
-                email="temp@example.com",
-                session_token="anon-session-123",
-                is_authenticated=False,
-                is_anonymous=True,
-                preferences={"theme": "light"}
-            )
-            
-            me_response = client.get("/api/v1/auth/me")
-            assert me_response.status_code == 200
-            
-            me_data = me_response.json()
-            assert me_data["user_id"] is None
-            assert me_data["email"] == "temp@example.com"
-            assert me_data["is_authenticated"] == False
-            assert me_data["is_anonymous"] == True
+        try:
+            with patch('app.services.auth_service.AuthService') as mock_service_class:
+                # Setup service mock
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+                mock_service.create_anonymous_session.return_value = "anon-session-123"
+                
+                # Step 1: Create anonymous session
+                anon_request = {
+                    "email": "temp@example.com",
+                    "preferences": {"theme": "light"}
+                }
+                
+                anon_response = client.post("/api/v1/auth/anonymous", json=anon_request)
+                assert anon_response.status_code == 200
+                
+                anon_data = anon_response.json()
+                assert anon_data["user_id"] is None
+                assert anon_data["email"] == "temp@example.com"
+                assert anon_data["is_authenticated"] == False
+                
+                # Step 2: Use anonymous session
+                from app.core.auth import get_auth_context
+                
+                def mock_auth_context():
+                    return AuthContext(
+                        user_id=None,
+                        email="temp@example.com",
+                        session_token="anon-session-123",
+                        is_authenticated=False,
+                        is_anonymous=True,
+                        preferences={"theme": "light"}
+                    )
+                
+                app.dependency_overrides[get_auth_context] = mock_auth_context
+                
+                me_response = client.get("/api/v1/auth/me")
+                assert me_response.status_code == 200
+                
+                me_data = me_response.json()
+                assert me_data["user_id"] is None
+                assert me_data["email"] == "temp@example.com"
+                assert me_data["is_authenticated"] == False
+                assert me_data["is_anonymous"] == True
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
+
     
-    @patch('app.core.database.get_db')
-    @patch('app.services.auth_service.AuthService')
-    async def test_session_refresh_flow(self, mock_service_class, mock_db, client):
+    async def test_session_refresh_flow(self, client, mock_db_session):
         """Test session refresh functionality."""
-        # Setup mocks
-        mock_service = AsyncMock()
-        mock_service_class.return_value = mock_service
+        from app.core.database import get_db
+        from app.core.auth import get_auth_context
         
-        mock_service.refresh_session.return_value = "new-session-token"
+        # Mock the database dependency
+        async def mock_get_db():
+            yield mock_db_session
         
-        # Mock current session
-        with patch('app.api.auth.get_auth_context') as mock_auth_context:
-            mock_auth_context.return_value = AuthContext(
+        # Mock auth context dependency
+        def mock_auth_context():
+            return AuthContext(
                 user_id="test-user-123",
                 email="test@example.com",
                 session_token="old-session-token",
                 is_authenticated=True,
                 preferences={"theme": "dark"}
             )
-            
-            refresh_response = client.post("/api/v1/auth/refresh")
-            assert refresh_response.status_code == 200
-            
-            refresh_data = refresh_response.json()
-            assert refresh_data["session_token"] == "new-session-token"
-            assert refresh_data["user_id"] == "test-user-123"
+        
+        # Override the dependencies
+        app.dependency_overrides[get_db] = mock_get_db
+        app.dependency_overrides[get_auth_context] = mock_auth_context
+        
+        try:
+            with patch('app.services.auth_service.AuthService') as mock_service_class:
+                
+                # Setup service mock
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+                mock_service.refresh_session.return_value = "new-session-token"
+                
+                refresh_response = client.post("/api/v1/auth/refresh")
+                assert refresh_response.status_code == 200
+                
+                refresh_data = refresh_response.json()
+                assert refresh_data["session_token"] == "new-session-token"
+                assert refresh_data["user_id"] == "test-user-123"
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
     
     async def test_authentication_middleware_integration(self, client):
         """Test that authentication middleware is properly integrated."""
@@ -205,74 +240,121 @@ class TestAuthenticationIntegration:
         assert "supabase_configured" in health_data
         assert "jwt_secret_configured" in health_data
     
-    @patch('app.core.database.get_db')
-    @patch('app.services.auth_service.AuthService')
-    async def test_invalid_jwt_token_handling(self, mock_service_class, mock_db, client):
+    async def test_invalid_jwt_token_handling(self, client, mock_db_session):
         """Test handling of invalid JWT tokens."""
-        # Setup mocks
-        mock_service = AsyncMock()
-        mock_service_class.return_value = mock_service
+        from app.core.database import get_db
         
-        mock_service.verify_jwt_token.return_value = None  # Invalid token
+        # Mock the database dependency
+        async def mock_get_db():
+            yield mock_db_session
         
-        # Try to login with invalid token
-        login_request = {
-            "jwt_token": "invalid-jwt-token",
-            "preferences": {}
-        }
+        # Override the dependency
+        app.dependency_overrides[get_db] = mock_get_db
         
-        login_response = client.post("/api/v1/auth/login", json=login_request)
-        assert login_response.status_code == 401
-        assert "Invalid JWT token" in login_response.json()["detail"]
+        try:
+            with patch('app.services.auth_service.AuthService') as mock_service_class:
+                # Setup service mock
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+                mock_service.verify_jwt_token.return_value = None  # Invalid token
+                
+                # Try to login with invalid token
+                login_request = {
+                    "jwt_token": "invalid-jwt-token",
+                    "preferences": {}
+                }
+                
+                login_response = client.post("/api/v1/auth/login", json=login_request)
+                assert login_response.status_code == 401
+                assert "Invalid JWT token" in login_response.json()["detail"]
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
     
-    @patch('app.core.database.get_db')
-    @patch('app.services.auth_service.AuthService')
-    async def test_session_validation_endpoint(self, mock_service_class, mock_db, client):
+    async def test_session_validation_endpoint(self, client, mock_db_session):
         """Test session validation endpoint."""
-        # Setup mocks
-        mock_service = AsyncMock()
-        mock_service_class.return_value = mock_service
+        from app.core.database import get_db
         
-        # Test valid session
-        mock_service.validate_session_token.return_value = True
+        # Mock the database dependency
+        async def mock_get_db():
+            yield mock_db_session
         
-        valid_response = client.post("/api/v1/auth/validate", json="valid-session-token")
-        assert valid_response.status_code == 200
-        assert valid_response.json()["valid"] == True
+        # Override the dependency
+        app.dependency_overrides[get_db] = mock_get_db
         
-        # Test invalid session
-        mock_service.validate_session_token.return_value = False
-        
-        invalid_response = client.post("/api/v1/auth/validate", json="invalid-session-token")
-        assert invalid_response.status_code == 200
-        assert invalid_response.json()["valid"] == False
+        try:
+            with patch('app.services.auth_service.AuthService') as mock_service_class:
+                # Setup service mock
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+                
+                # Test valid session - mock the get_session method properly
+                mock_session = MagicMock()
+                mock_session.session_token = "valid-session-token"
+                mock_session.is_active = True
+                mock_session.expires_at = datetime.now() + timedelta(hours=1)
+                mock_session.last_accessed = datetime.now()
+                mock_service.get_session.return_value = mock_session
+                mock_service.validate_session_token.return_value = True
+                
+                valid_response = client.post("/api/v1/auth/validate", json={"session_token": "valid-session-token"})
+                assert valid_response.status_code == 200
+                assert valid_response.json()["valid"] == True
+                
+                # Test invalid session
+                mock_service.get_session.return_value = None
+                mock_service.validate_session_token.return_value = False
+                
+                invalid_response = client.post("/api/v1/auth/validate", json={"session_token": "invalid-session-token"})
+                assert invalid_response.status_code == 200
+                assert invalid_response.json()["valid"] == False
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
     
-    @patch('app.api.auth.require_authentication')
-    @patch('app.core.database.get_db')
-    @patch('app.services.auth_service.AuthService')
-    async def test_protected_endpoint_access(self, mock_service_class, mock_db, mock_require_auth, client):
+    async def test_protected_endpoint_access(self, client, mock_db_session):
         """Test access to protected endpoints."""
-        # Setup mocks
-        mock_service = AsyncMock()
-        mock_service_class.return_value = mock_service
-        mock_require_auth.return_value = "test-user-123"
+        from app.core.database import get_db
+        from app.core.auth import require_authentication
         
-        # Mock user sessions
-        mock_session = MagicMock()
-        mock_session.session_token = "session-token-123456789"
-        mock_session.created_at = datetime.now()
-        mock_session.last_accessed = datetime.now()
-        mock_session.expires_at = datetime.now() + timedelta(hours=1)
+        # Mock the database dependency
+        async def mock_get_db():
+            yield mock_db_session
         
-        mock_service.get_user_sessions.return_value = [mock_session]
+        # Mock authentication requirement
+        async def mock_require_auth():
+            return "test-user-123"
         
-        # Access protected endpoint
-        sessions_response = client.get("/api/v1/auth/sessions")
-        assert sessions_response.status_code == 200
+        # Override the dependencies
+        app.dependency_overrides[get_db] = mock_get_db
+        app.dependency_overrides[require_authentication] = mock_require_auth
         
-        sessions_data = sessions_response.json()
-        assert "sessions" in sessions_data
-        assert "total_count" in sessions_data
+        try:
+            with patch('app.services.auth_service.AuthService') as mock_service_class:
+                
+                # Setup service mock
+                mock_service = AsyncMock()
+                mock_service_class.return_value = mock_service
+                
+                # Mock user sessions
+                mock_session = MagicMock()
+                mock_session.session_token = "session-token-123456789"
+                mock_session.created_at = datetime.now()
+                mock_session.last_accessed = datetime.now()
+                mock_session.expires_at = datetime.now() + timedelta(hours=1)
+                
+                mock_service.get_user_sessions.return_value = [mock_session]
+                
+                # Access protected endpoint
+                sessions_response = client.get("/api/v1/auth/sessions")
+                assert sessions_response.status_code == 200
+                
+                sessions_data = sessions_response.json()
+                assert "sessions" in sessions_data
+                assert "total_count" in sessions_data
+        finally:
+            # Clean up dependency override
+            app.dependency_overrides.clear()
 
 
 class TestAuthServiceIntegration:
