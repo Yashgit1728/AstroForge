@@ -2,6 +2,7 @@
 Authentication middleware and dependencies for FastAPI.
 """
 import logging
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -174,11 +175,87 @@ class AuthMiddleware:
     
     def __init__(self, app):
         self.app = app
+        self._last_cleanup = datetime.now()
+        self._cleanup_interval = timedelta(hours=1)  # Cleanup every hour
     
     async def __call__(self, scope, receive, send):
         """ASGI middleware implementation."""
-        # For now, just pass through to the app
-        # In the future, we could add session cleanup logic here
+        # Periodic session cleanup
+        if scope["type"] == "http":
+            await self._maybe_cleanup_sessions(scope)
+        
+        await self.app(scope, receive, send)
+    
+    async def _maybe_cleanup_sessions(self, scope):
+        """Perform periodic session cleanup."""
+        now = datetime.now()
+        if now - self._last_cleanup > self._cleanup_interval:
+            try:
+                # Import here to avoid circular imports
+                from ..core.database import get_db
+                from ..services.auth_service import AuthService
+                
+                # Get database session
+                db_gen = get_db()
+                db = await db_gen.__anext__()
+                
+                try:
+                    auth_service = AuthService(db)
+                    cleaned_count = await auth_service.cleanup_expired_sessions()
+                    if cleaned_count > 0:
+                        logger.info(f"Cleaned up {cleaned_count} expired sessions")
+                finally:
+                    await db.close()
+                
+                self._last_cleanup = now
+                
+            except Exception as e:
+                logger.error(f"Error during session cleanup: {e}")
+
+
+class JWTValidationMiddleware:
+    """Middleware for validating JWT tokens and setting user context."""
+    
+    def __init__(self, app):
+        self.app = app
+    
+    async def __call__(self, scope, receive, send):
+        """ASGI middleware implementation."""
+        if scope["type"] == "http":
+            # Extract and validate JWT token if present
+            headers = dict(scope.get("headers", []))
+            auth_header = headers.get(b"authorization", b"").decode()
+            
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]  # Remove "Bearer " prefix
+                
+                # Import here to avoid circular imports
+                from ..services.auth_service import AuthService
+                from ..core.database import get_db
+                
+                try:
+                    # Get database session
+                    db_gen = get_db()
+                    db = await db_gen.__anext__()
+                    
+                    try:
+                        auth_service = AuthService(db)
+                        jwt_payload = await auth_service.verify_jwt_token(token)
+                        
+                        if jwt_payload:
+                            # Add user context to scope for downstream use
+                            scope["user_context"] = {
+                                "user_id": jwt_payload["user_id"],
+                                "email": jwt_payload.get("email"),
+                                "is_authenticated": True,
+                                "jwt_payload": jwt_payload
+                            }
+                    finally:
+                        await db.close()
+                        
+                except Exception as e:
+                    logger.error(f"Error validating JWT token: {e}")
+        
         await self.app(scope, receive, send)
 
 
@@ -189,5 +266,6 @@ __all__ = [
     'get_current_user',
     'require_authentication',
     'get_optional_user',
-    'AuthMiddleware'
+    'AuthMiddleware',
+    'JWTValidationMiddleware'
 ]

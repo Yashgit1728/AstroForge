@@ -9,7 +9,6 @@ import secrets
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
-import jwt
 try:
     from supabase import create_client, Client
     from gotrue.errors import AuthError
@@ -62,7 +61,8 @@ class AuthService:
         try:
             if not self.supabase_client:
                 logger.warning("Supabase client not initialized")
-                return None
+                # Fallback: try to decode JWT manually if we have the secret
+                return await self._verify_jwt_fallback(token)
             
             # Verify token with Supabase
             user = self.supabase_client.auth.get_user(token)
@@ -71,7 +71,9 @@ class AuthService:
                 return {
                     "user_id": user.user.id,
                     "email": user.user.email,
-                    "metadata": user.user.user_metadata
+                    "metadata": user.user.user_metadata or {},
+                    "aud": user.user.aud,
+                    "role": user.user.role
                 }
             
             return None
@@ -81,6 +83,72 @@ class AuthService:
             return None
         except Exception as e:
             logger.error(f"Unexpected error verifying JWT token: {e}")
+            return None
+    
+    async def _verify_jwt_fallback(self, token: str) -> Optional[Dict[str, Any]]:
+        """
+        Fallback JWT verification when Supabase client is not available.
+        
+        Args:
+            token: JWT token to verify
+            
+        Returns:
+            Token payload if valid, None otherwise
+        """
+        try:
+            import jwt
+            from jwt.exceptions import InvalidTokenError, ExpiredSignatureError
+            
+            # Try with JWT secret if available
+            if settings.JWT_SECRET_KEY:
+                try:
+                    payload = jwt.decode(
+                        token,
+                        settings.JWT_SECRET_KEY,
+                        algorithms=[settings.JWT_ALGORITHM],
+                        options={"verify_aud": False}  # Supabase uses different audience validation
+                    )
+                    
+                    # Validate required fields
+                    if "sub" in payload:
+                        return {
+                            "user_id": payload["sub"],
+                            "email": payload.get("email"),
+                            "metadata": payload.get("user_metadata", {}),
+                            "aud": payload.get("aud"),
+                            "role": payload.get("role", "authenticated"),
+                            "exp": payload.get("exp"),
+                            "iat": payload.get("iat")
+                        }
+                except ExpiredSignatureError:
+                    logger.warning("JWT token has expired")
+                    return None
+                except InvalidTokenError as e:
+                    logger.warning(f"Invalid JWT token: {e}")
+                    return None
+            
+            # For development/testing, allow unverified tokens
+            if settings.ENVIRONMENT == "development":
+                try:
+                    # Decode without verification (for testing only)
+                    payload = jwt.decode(token, options={"verify_signature": False})
+                    
+                    # Basic validation of required fields
+                    if "sub" in payload:
+                        return {
+                            "user_id": payload["sub"],
+                            "email": payload.get("email"),
+                            "metadata": payload.get("user_metadata", {}),
+                            "aud": payload.get("aud"),
+                            "role": payload.get("role", "authenticated")
+                        }
+                except InvalidTokenError:
+                    pass
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"JWT fallback verification failed: {e}")
             return None
     
     async def create_anonymous_session(
@@ -322,6 +390,89 @@ class AuthService:
             await self.db.rollback()
             logger.error(f"Failed to cleanup expired sessions: {e}")
             return 0
+    
+    async def validate_session_token(self, session_token: str) -> bool:
+        """
+        Validate if a session token is valid and active.
+        
+        Args:
+            session_token: Session token to validate
+            
+        Returns:
+            True if valid, False otherwise
+        """
+        try:
+            session = await self.get_session(session_token)
+            return session is not None and session.is_active
+            
+        except Exception as e:
+            logger.error(f"Failed to validate session token: {e}")
+            return False
+    
+    async def get_user_sessions(self, user_id: str) -> list[DBUserSession]:
+        """
+        Get all active sessions for a user.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            List of active sessions
+        """
+        try:
+            query = select(DBUserSession).where(
+                and_(
+                    DBUserSession.user_id == user_id,
+                    DBUserSession.is_active == True,
+                    DBUserSession.expires_at > datetime.now()
+                )
+            ).order_by(DBUserSession.last_accessed.desc())
+            
+            result = await self.db.execute(query)
+            sessions = result.scalars().all()
+            
+            return list(sessions)
+            
+        except Exception as e:
+            logger.error(f"Failed to get user sessions: {e}")
+            return []
+    
+    async def update_session_preferences(
+        self,
+        session_token: str,
+        preferences: Dict[str, Any]
+    ) -> bool:
+        """
+        Update session preferences.
+        
+        Args:
+            session_token: Session token
+            preferences: New preferences
+            
+        Returns:
+            True if updated successfully, False otherwise
+        """
+        try:
+            session = await self.get_session(session_token)
+            
+            if not session:
+                return False
+            
+            # Merge with existing preferences
+            current_prefs = session.preferences or {}
+            current_prefs.update(preferences)
+            session.preferences = current_prefs
+            
+            await self.db.commit()
+            
+            logger.info(f"Updated preferences for session {session_token[:8]}...")
+            
+            return True
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to update session preferences: {e}")
+            return False
     
     async def _deactivate_user_sessions(self, user_id: str) -> int:
         """

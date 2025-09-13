@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # Supabase
     SUPABASE_URL: str = Field(default="")
     SUPABASE_ANON_KEY: str = Field(default="")
+    SUPABASE_SERVICE_KEY: str = Field(default="")
+    
+    # JWT Configuration
+    JWT_ALGORITHM: str = Field(default="HS256")
+    JWT_SECRET_KEY: str = Field(default="")  # For Supabase JWT verification
 
 
 settings = Settings()

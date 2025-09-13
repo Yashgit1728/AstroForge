@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.auth import AuthMiddleware, JWTValidationMiddleware
 from app.api.vehicle_presets import router as vehicle_presets_router
 from app.api.missions import router as missions_router
 from app.api.auth import router as auth_router
@@ -26,6 +27,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add authentication middleware
+app.add_middleware(AuthMiddleware)
+app.add_middleware(JWTValidationMiddleware)
 
 # Include API routers
 app.include_router(vehicle_presets_router, prefix=settings.API_V1_STR)
