@@ -42,12 +42,14 @@ class TestGalleryEndpoints:
     """Test gallery API endpoints."""
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_get_featured_missions(self, mock_service_class, mock_db, client, sample_mission_summary):
+    @patch('app.api.gallery.GalleryService')
+    @patch('app.api.gallery.get_current_user')
+    def test_get_featured_missions(self, mock_get_user, mock_service_class, mock_db, client, sample_mission_summary):
         """Test getting featured missions."""
         # Setup mocks
         mock_service = AsyncMock()
         mock_service_class.return_value = mock_service
+        mock_get_user.return_value = None
         
         mock_service.get_featured_missions.return_value = [sample_mission_summary]
         
@@ -67,8 +69,8 @@ class TestGalleryEndpoints:
         mock_service.get_featured_missions.assert_called_once_with(10, None)
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_get_example_missions(self, mock_service_class, mock_db, client, sample_mission_summary):
+    @patch('app.api.gallery.GalleryService')
+    def test_get_example_missions(self, mock_service_class, mock_db, client, sample_mission_summary):
         """Test getting example missions."""
         # Setup mocks
         mock_service = AsyncMock()
@@ -94,8 +96,8 @@ class TestGalleryEndpoints:
         mock_service.get_example_missions.assert_called_once_with("mars", 4, 20)
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_get_popular_missions(self, mock_service_class, mock_db, client, sample_mission_summary):
+    @patch('app.api.gallery.GalleryService')
+    def test_get_popular_missions(self, mock_service_class, mock_db, client, sample_mission_summary):
         """Test getting popular missions."""
         # Setup mocks
         mock_service = AsyncMock()
@@ -119,12 +121,14 @@ class TestGalleryEndpoints:
         mock_service.get_popular_missions.assert_called_once_with("week", 10)
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_search_missions(self, mock_service_class, mock_db, client):
+    @patch('app.api.gallery.GalleryService')
+    @patch('app.api.gallery.get_current_user')
+    def test_search_missions(self, mock_get_user, mock_service_class, mock_db, client):
         """Test mission search functionality."""
         # Setup mocks
         mock_service = AsyncMock()
         mock_service_class.return_value = mock_service
+        mock_get_user.return_value = None
         
         from app.schemas.mission import MissionListResponse
         mock_response = MissionListResponse(
@@ -160,12 +164,14 @@ class TestGalleryEndpoints:
         assert call_args.kwargs["filters"]["target_body"] == "mars"
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_advanced_search_missions(self, mock_service_class, mock_db, client):
+    @patch('app.api.gallery.GalleryService')
+    @patch('app.api.gallery.get_current_user')
+    def test_advanced_search_missions(self, mock_get_user, mock_service_class, mock_db, client):
         """Test advanced search with POST request."""
         # Setup mocks
         mock_service = AsyncMock()
         mock_service_class.return_value = mock_service
+        mock_get_user.return_value = None
         
         from app.schemas.mission import MissionListResponse
         mock_response = MissionListResponse(
@@ -205,8 +211,8 @@ class TestGalleryEndpoints:
         mock_service.search_missions_advanced.assert_called_once()
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_get_mission_categories(self, mock_service_class, mock_db, client):
+    @patch('app.api.gallery.GalleryService')
+    def test_get_mission_categories(self, mock_service_class, mock_db, client):
         """Test getting mission categories."""
         # Setup mocks
         mock_service = AsyncMock()
@@ -234,8 +240,8 @@ class TestGalleryEndpoints:
         mock_service.get_mission_categories.assert_called_once()
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_get_difficulty_distribution(self, mock_service_class, mock_db, client):
+    @patch('app.api.gallery.GalleryService')
+    def test_get_difficulty_distribution(self, mock_service_class, mock_db, client):
         """Test getting difficulty distribution."""
         # Setup mocks
         mock_service = AsyncMock()
@@ -256,15 +262,17 @@ class TestGalleryEndpoints:
         # Assertions
         assert response.status_code == 200
         data = response.json()
-        assert data == mock_distribution
+        # JSON converts integer keys to strings
+        expected_data = {str(k): v for k, v in mock_distribution.items()}
+        assert data == expected_data
         assert data["3"] == 12  # JSON keys are strings
         
         # Verify service call
         mock_service.get_difficulty_distribution.assert_called_once()
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_get_gallery_stats(self, mock_service_class, mock_db, client):
+    @patch('app.api.gallery.GalleryService')
+    def test_get_gallery_stats(self, mock_service_class, mock_db, client):
         """Test getting comprehensive gallery stats."""
         # Setup mocks
         mock_service = AsyncMock()
@@ -302,13 +310,15 @@ class TestGalleryEndpoints:
         mock_service.get_difficulty_distribution.assert_called_once()
     
     @patch('app.api.gallery.get_db')
-    @patch('app.services.gallery_service.GalleryService')
-    async def test_get_mission_suggestions(self, mock_service_class, mock_db, client, sample_mission_summary):
+    @patch('app.api.gallery.GalleryService')
+    @patch('app.api.gallery.get_current_user')
+    def test_get_mission_suggestions(self, mock_get_user, mock_service_class, mock_db, client, sample_mission_summary):
         """Test getting mission suggestions."""
         # Setup mocks
         mock_service = AsyncMock()
         mock_service_class.return_value = mock_service
         
+        mock_get_user.return_value = None
         mock_service.get_featured_missions.return_value = [sample_mission_summary]
         
         # Make request
@@ -324,14 +334,14 @@ class TestGalleryEndpoints:
         # Verify service call
         mock_service.get_featured_missions.assert_called_once_with(5, None)
     
-    async def test_search_missions_invalid_query(self, client):
+    def test_search_missions_invalid_query(self, client):
         """Test search with invalid query parameters."""
         # Empty query should fail validation
         response = client.get("/api/v1/gallery/search?q=")
         
         assert response.status_code == 422  # Validation error
     
-    async def test_popular_missions_invalid_time_period(self, client):
+    def test_popular_missions_invalid_time_period(self, client):
         """Test popular missions with invalid time period."""
         response = client.get("/api/v1/gallery/popular?time_period=invalid")
         

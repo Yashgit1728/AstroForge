@@ -171,7 +171,12 @@
 
     - _Requirements: 6.1, 6.2, 6.3_
 
-  - [ ] 6.3 Create gallery and search API
+  - [x] 6.3 Create gallery and search API
+
+
+
+
+
     - Implement mission gallery endpoints with pagination
     - Add search functionality with filtering by mission type and metrics
     - Create endpoints for example mission browsing
