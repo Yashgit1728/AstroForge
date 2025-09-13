@@ -1,4 +1,4 @@
-;"""
+"""
 OpenAI LLM provider implementation.
 """
 

@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.vehicle_presets import router as vehicle_presets_router
+from app.api.missions import router as missions_router
+from app.api.auth import router as auth_router
+from app.api.gallery import router as gallery_router
 
 app = FastAPI(
     title="AstraForge API",
@@ -26,6 +29,9 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(vehicle_presets_router, prefix=settings.API_V1_STR)
+app.include_router(missions_router, prefix=settings.API_V1_STR)
+app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(gallery_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")
